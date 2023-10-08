@@ -13,6 +13,8 @@ library(tidyverse)
 library(ggridges)
 library(p8105.datasets)
 library(dplyr)
+library(ggplot2)
+library(readr)
 ```
 ```{r}
 knitr::opts_chunk$set(
@@ -82,52 +84,39 @@ include only responses from “Excellent” to “Poor”
 organize responses as a factor taking levels ordered from “Poor” to “Excellent”
 
 ```{r}
-brfss_df = 
-  brfss_smart2010 |>
+
+brfss_df = brfss_smart2010|> 
   janitor::clean_names() |> 
-  filter(
-    topic == "Overall Health",
-    response %in% c("Excellent","Very Good","Good","Fair","Poor")
-  ) |>
-  mutate(
-    response = factor(
-      response,
-      levels = c("Poor","Fair","Good","Very Good","Excellent"),
-      ordered = TRUE
-    )
-  ) |> 
-  separate(
-    col = locationdesc,
-    into = c("state","county"),
-    sep = "-",
-    remove = TRUE
-  ) |> 
-  select(year,state,county,class,topic,question,response,sample_size,data_value,geo_location)
-  view(brfss_df)
+  filter(topic == "Overall Health") |> 
+  mutate(response = factor(response, 
+                           levels = c("Excellent", "Very good", "Good", "Fair", "Poor"),
+                           order = T)
+                           )
 ```
 ##### Answer questions
 
 *1.In 2002, which states were observed at 7 or more locations? What about in 2010?
 ```{r}
-state_2002 = 
+state_2002 =
   brfss_df |> 
   filter(
     year == 2002,
     response == "Excellent") |> 
-  group_by(year,state) |> 
+  group_by(year, locationabbr) |> 
   summarize(n_county = n()) |> 
-  filter(n_county >=7) |> 
-  pull(state)
+  filter(n_county >= 7) |> 
+  pull(locationabbr)
 
-state_2010 = 
+
+state_2010 =
   brfss_df |> 
   filter(
     year == 2010,
     response == "Excellent") |> 
-  group_by(year,state) |> 
+  group_by(year, locationabbr) |> 
   summarize(n_county = n()) |> 
-  filter(n_county >=7) |> 
-  pull(state)
+  filter(n_county >= 7) |> 
+  pull(locationabbr)
 
 ```
 In 2002, the states observed at 7 or more locations are `r state_2002`
@@ -135,35 +124,132 @@ In 2010, the states observed at 7 or more locations are `r state_2010`
 
 *2.Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. Make a “spaghetti” plot of this average value over time within a state (that is, make a plot showing a line for each state across years – the geom_line geometry and group aesthetic will help).
 ```{r}
-excellent_df =
+excellent_df = 
   brfss_df |> 
   filter(response == "Excellent") |> 
-  group_by(year,state) |> 
-  summarize(avg_value = mean(data_value, na.rm = TRUE))
-excellent_df
+  group_by(year, locationabbr) |> 
+  summarize(avg = mean(data_value, na.rm = T))
 ```
 ```{r}
 excellent_plot =
   ggplot(
     excellent_df,
-    aes(x = year, y = avg_value, color = state, group = state)) +
-    geom_line() +
-    theme_minimal() +
-    labs(title = "Spaghetti plot: Average value of excellent responses over time within a state",
-         x = "Year",
-         y = "Average value of excellent responses")
+    aes(x = year, y = avg, color = locationabbr, group = locationabbr)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Spaghetti plot of  average value over time within states",
+       x = "Year",
+       y = "Average value of excellent responses")
 excellent_plot
-```
-```{r}
-min_df = 
-  excellent_df |> 
-  filter(year == 2005)
-view(min_df)
 ```
 
 From the plot, it is clear to see that the plot of the state `WV` is significantly different from other states, with low values in the year of 2005 and 2009.
 
 *3.Make a two-panel plot showing, for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State.
+
+```{r}
+ny_data = brfss_df |> 
+  filter(locationabbr == "NY", year %in% c(2006, 2010))
+
+ny_plot = ggplot(ny_data, aes(x=response, y=data_value)) +
+  geom_boxplot() +
+  facet_wrap(~year, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Distribution of health responses among locations in NY for 2006 and 2010",
+       x = "Response",
+       y = "Value")
+ny_plot
+```
+From the two-panel plot, it is clear to see that for the year of 2006 and 2010, in New York state,the distribution of health responses is similar: both have the high data value for "Good" response and low data value for the "Poor" response. However, compared to the year of 2006, in 2010, the distribution for "Very good" and "Good" responses have a bigger difference.
+## HW3 Problem 3 
+
+##### Data cleaning
+Load, tidy, merge, and otherwise organize the data sets. Your final dataset should include all originally observed variables; exclude participants less than `21` years of age, and those with missing demographic data; and encode data with reasonable variable classes (i.e. not numeric, and using factors with the ordering of tables and plots in mind).
+```{r}
+covar_df =
+  read_csv("nhanes_covar.csv", skip = 4, show_col_types = FALSE) |>
+  janitor::clean_names() |> 
+  mutate(
+    sex = case_match(
+      sex,
+      1 ~ "Male",
+      2 ~ "Female"
+    ),
+    education = case_match(
+      education,
+      1 ~ "Less than high school",
+      2 ~ "High school equivalent",
+      3 ~ "More than high school"
+    ),
+    education = factor(education, levels = c("Less than high school", 
+                                                  "High school equivalent", 
+                                                  "More than high school"))
+)|> 
+  filter(age >= 21) |> 
+  na.omit()
+
+accel_df =
+  read_csv("nhanes_accel.csv") |> 
+  janitor::clean_names() |> 
+  pivot_longer(
+    min1:min1440,
+    names_to = "min",
+    values_to = "avgmin"
+  )
+
+```
+```{r}
+join_covar_accel =
+  inner_join(covar_df, accel_df, by = "seqn")
+```
+##### Table
+Produce a reader-friendly table for the number of men and women in each education category, and create a visualization of the age distributions for men and women in each education category. Comment on these items.
+```{r}
+men_women_df = 
+  join_covar_accel|> 
+  group_by(sex,education)|>
+  summarize(num_people=n())|>
+  pivot_wider(
+    names_from="education",
+    values_from = "num_people"
+  )|>
+  knitr::kable(caption="Number of Men and Women in Each Education Category")
+men_women_df
+```
+From the table, it is clear to see that for both sex, `more than high school` education level contains more participants. More females than males have education less than high school and more males have education equivalent to high school. 
+```{r}
+men_women_plot = 
+join_covar_accel|>
+  ggplot(aes(x=sex,y=age))+
+  geom_boxplot()+
+  facet_wrap(~education)+
+  labs(
+    title="Age Distribution by Gender and Education",
+    x = "sex",
+    y = "Age"
+  )
+men_women_plot
+```
+
+From the boxplots above, it is clear to see that the age distributions for men and women are almost the same if the participants have `less than high school` (~60 years old) or `more than high school` (~40 years old) level of education. However, among participants with a `high school equivalent` education, the distribution between famale ann male is much more different: females have a higher average age compared to males (more than 60 years old vs less than 60 years old). , with an average age exceeding 60 years, whereas males have an average age of just over 50. 
+
+##### Accelerometer data
+Traditional analyses of accelerometer data focus on the total activity over the day. Using your tidied dataset, aggregate across minutes to create a total activity variable for each participant. Plot these total activities (y-axis) against age (x-axis); your plot should compare men to women and have separate panels for each education level. Include a trend line or a smooth to illustrate differences. Comment on your plot.
+```{r}
+accel_data =
+  join_covar_accel |> 
+  group_by(seqn,sex,age,education)|>
+  summarize(
+    total_activity=sum(avgmin)
+  )|>
+  ggplot(
+    aes(x=age,y=total_activity,color = sex)
+  )+
+  geom_point()+
+  geom_smooth() + 
+  facet_wrap(~education)
+accel_data
+```
 
 
 
