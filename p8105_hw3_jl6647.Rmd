@@ -193,8 +193,8 @@ accel_df =
   janitor::clean_names() |> 
   pivot_longer(
     min1:min1440,
-    names_to = "min",
-    values_to = "avgmin"
+    names_to = "minute",
+    values_to = "MIMS"
   )
 
 ```
@@ -202,7 +202,7 @@ accel_df =
 join_covar_accel =
   inner_join(covar_df, accel_df, by = "seqn")
 ```
-##### Table
+##### Number of men and women in each education category and its distribution
 Produce a reader-friendly table for the number of men and women in each education category, and create a visualization of the age distributions for men and women in each education category. Comment on these items.
 ```{r}
 men_women_df = 
@@ -231,7 +231,7 @@ join_covar_accel|>
 men_women_plot
 ```
 
-From the boxplots above, it is clear to see that the age distributions for men and women are almost the same if the participants have `less than high school` (~60 years old) or `more than high school` (~40 years old) level of education. However, among participants with a `high school equivalent` education, the distribution between famale ann male is much more different: females have a higher average age compared to males (more than 60 years old vs less than 60 years old). , with an average age exceeding 60 years, whereas males have an average age of just over 50. 
+From the boxplots above, it is clear to see that the age distributions for men and women are almost the same if the participants have `less than high school` (~60 years old) or `more than high school` (~40 years old) level of education. However, among participants with a `high school equivalent` education, the distribution between famale and male is much more different: females have a higher average age compared to males (more than 60 years old vs less than 60 years old). , with an average age exceeding 60 years, whereas males have an average age of just over 50. 
 
 ##### Accelerometer data
 Traditional analyses of accelerometer data focus on the total activity over the day. Using your tidied dataset, aggregate across minutes to create a total activity variable for each participant. Plot these total activities (y-axis) against age (x-axis); your plot should compare men to women and have separate panels for each education level. Include a trend line or a smooth to illustrate differences. Comment on your plot.
@@ -240,7 +240,7 @@ accel_data =
   join_covar_accel |> 
   group_by(seqn,sex,age,education)|>
   summarize(
-    total_activity=sum(avgmin)
+    total_activity=sum(MIMS)
   )|>
   ggplot(
     aes(x=age,y=total_activity,color = sex)
@@ -250,6 +250,13 @@ accel_data =
   facet_wrap(~education)
 accel_data
 ```
+
+From the plot above, it is clear to see that in three categories, regardless of sex, total activity duration significantly decreases with increasing age from 20 to 80 years old. If we look further into each category, we can also see differences, for example, in `less than high school` and `more than high school` group, there's a distinct peak at 60 years old for both male and female, however, in `high school equivalent` group, the peak exists at the age of 40. 
+
+#####  24-hour activity time courses for each education level
+
+Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
+
 
 
 
